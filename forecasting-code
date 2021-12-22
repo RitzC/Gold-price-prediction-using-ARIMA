@@ -1,0 +1,88 @@
+#Gold Forecasting Model
+
+rm(list = ls())
+
+#Libraries
+library(tseries)
+library(readxl)
+library(ggplot2)
+library(fpp)
+library(caTools)
+library("fUnitRoots")
+library(lmtest)
+library("forecast")
+library(FitAR)
+library(MASS)
+library(leaps)
+library(car)
+library(DAAG)
+library(bootstrap)
+
+setwd("C:/Personal/PL/MADP/Gold forecast")
+
+golddata <- read.csv("Levels.csv")
+colnames(golddata) <- c("Date", "GoldPrice", "5Yinflationexp","TedSpread",
+                        "10Ybondyield","InflationTyield","M2","USDIndex",
+                        "OilPrice","USEUP","5YBreakeveninflation","ETFHoldings",
+                        "MoMholdings","NetGoldpositions")
+
+goldprice <- golddata$GoldPrice
+goldprice <- na.remove(goldprice)
+
+#n <- NROW(goldprice)
+#n <- round(0.8*n)
+#train <- goldprice[1:n]
+#test <- na.remove(goldprice[n+1:NROW(goldprice)])
+
+# Model- 1 Forecasting using box Jenkins Model#
+
+goldprice <- ts(goldprice, frequency = 12, start = c(2003,03))
+
+plot(goldprice, type="l")
+ ### BoxCox transformation for constant variance
+#lamda <- BoxCox.lambda(goldprice)
+#goldstan <- BoxCox(na.remove(goldprice),lambda=lamda)
+#tsdisplay(goldstan)
+
+## ADF test for checking stationarity
+
+adf <- adf.test(goldprice)
+adf # p value greater than 0.05 means series is non-stationary
+
+#### ADF shows that the data is non stationary
+### so to make is stationary, we will do first differencing
+
+golddiff <- diff(goldprice, differences = 1)
+
+plot.ts(golddiff)
+
+### Model estimation for ARIMA###
+dev.off() # clears plot area
+par(mar=c(2,2,2,2)) # set plot nargin
+
+acf(golddiff, lag.max = 20)
+
+pacf(golddiff, lag.max = 20)
+
+## Auto Selection of Model###
+
+auto.arima(goldprice, trace = TRUE,  ic ="aicc", approximation = FALSE, stepwise = FALSE)
+
+model1 <- Arima(goldprice, order = c(2,1,2), include.drift = FALSE)
+
+summary(model1)
+
+### Residual Diagnostics ###
+
+tsdisplay(residuals(model1))
+
+Box.test(model1$residuals, lag=20,type = "Ljung-Box") # p>0.05 means residuals are independent
+
+#### Forecasting####
+
+forecast_model1 <- predict(model1, n.ahead = 5)
+#fit <- InvBoxCox(forecast_model1$fitted, lambda = lamda)
+plot(model1$fitted)
+lines(goldprice, col="red")
+
+
